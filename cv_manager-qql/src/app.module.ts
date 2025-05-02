@@ -19,6 +19,6 @@ import { SkillModule } from './skill/skill.module';
     CvModule,
     UserModule,
     SkillModule,
-  ]
+  ],
 })
 export class AppModule {}

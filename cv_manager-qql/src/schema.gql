@@ -1,0 +1,64 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type User {
+  id: ID!
+  name: String!
+  email: String!
+  role: String!
+  cvs: [Cv!]
+}
+
+type Skill {
+  id: ID!
+  designation: String!
+  cvs: [Cv!]
+}
+
+type Cv {
+  id: ID!
+  name: String!
+  age: Float!
+  job: String!
+  user: User!
+  skills: [Skill!]!
+}
+
+type Query {
+  cvs: [Cv!]!
+  cv(id: ID!): Cv
+  users: [User!]!
+  user(id: ID!): User
+  skills: [Skill!]!
+  skill(id: ID!): Skill
+}
+
+type Mutation {
+  createCv(createCvInput: CreateCvInput!): Cv!
+  updateCv(updateCvInput: UpdateCvInput!): Cv!
+  deleteCv(id: ID!): Cv!
+}
+
+input CreateCvInput {
+  name: String!
+  age: Float!
+  job: String!
+  userId: ID!
+  skillIds: [ID!]!
+}
+
+input UpdateCvInput {
+  name: String
+  age: Float
+  job: String
+  userId: ID
+  skillIds: [ID!]
+  id: ID!
+}
+
+type Subscription {
+  cvAdded: Cv!
+  cvUpdated: Cv!
+  cvDeleted: Cv!
+}
