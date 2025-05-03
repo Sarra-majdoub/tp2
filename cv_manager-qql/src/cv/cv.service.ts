@@ -1,12 +1,19 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { Context } from '../context';
 import { DbCv } from '../db';
 import { CreateCvInput } from './dto/create-cv.input';
 import { UpdateCvInput } from './dto/update-cv.input';
 import { pubSub, CvEvents } from './cv.pubsub';
+import { PUB_SUB } from './pubsub.provider';
+import { PubSub } from 'graphql-subscriptions';
 
 @Injectable()
 export class CvService {
+  constructor(
+    @Inject(PUB_SUB) private pubSub: PubSub,
+  ) {}
+  
+
   getCvs(context: Context) {
     return context.db.cvs;
   }
@@ -24,6 +31,7 @@ export class CvService {
   }
 
   createCv(createCvInput: CreateCvInput, context: Context) {
+
     const userExists = context.db.users.some(
       (user) => user.id === createCvInput.userId,
     );
@@ -45,9 +53,15 @@ export class CvService {
     };
     context.db.cvs.push(newCv);
 
-    // Publish the CV creation event
-    pubSub.publish(CvEvents.CV_ADDED, { cvCreated: newCv });
+    // CV creation event
+
+    pubSub.publish( CvEvents.CV_ADDED, { cvCreated: newCv });
+
+    //debugging
+    console.log('Published CV_ADDED event:', newCv);
+    
     return newCv;
+
   }
 
   updateCv(updateCvInput: UpdateCvInput, context: Context) {
