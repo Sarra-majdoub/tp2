@@ -13,7 +13,7 @@ export class CvResolver {
 
   @Query(() => [Cv])
   async cvs(): Promise<Cv[]> {
-    return this.cvService.getCvs();
+    return this.cvService.getCvs() as unknown as Cv[];
   }
 
   @Query(() => Cv, { nullable: true })
@@ -23,7 +23,11 @@ export class CvResolver {
 
   @ResolveField(() => User)
   async user(@Parent() cv: Cv): Promise<User> {
-    return this.cvService.getUserForCv(cv.id);
+    const user = await this.cvService.getUserForCv(cv.id);
+    if (!user) {
+      throw new Error(`User not found for CV with ID ${cv.id}`);
+    }
+    return user;
   }
 
   @ResolveField(() => [Skill])

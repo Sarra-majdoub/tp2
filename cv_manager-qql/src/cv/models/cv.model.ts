@@ -17,8 +17,9 @@ export class Cv {
   job: string;
 
   @Field(() => User)
-  user: User;
-
+  user?: User;
   @Field(() => [Skill])
-  skills: Skill[];
+  skills?: Skill[];
+
+  userId?: string;
 }

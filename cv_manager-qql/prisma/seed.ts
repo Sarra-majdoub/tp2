@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
+  
   // Créer des utilisateurs
   const user1 = await prisma.user.create({
     data: {
