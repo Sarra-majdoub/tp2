@@ -2,63 +2,63 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
 # ------------------------------------------------------
 
-type User {
-  id: ID!
+input CreateCvInput {
+  age: Float!
+  job: String!
   name: String!
-  email: String!
-  role: String!
-  cvs: [Cv!]
-}
-
-type Skill {
-  id: ID!
-  designation: String!
-  cvs: [Cv!]
+  skillIds: [ID!]!
+  userId: ID!
 }
 
 type Cv {
-  id: ID!
-  name: String!
   age: Float!
+  id: ID!
   job: String!
+  name: String!
+  skills: [Skill!]!
   user: User!
-  skills: [Skill!]!
-}
-
-type Query {
-  cvs: [Cv!]!
-  cv(id: ID!): Cv
-  users: [User!]!
-  user(id: ID!): User
-  skills: [Skill!]!
-  skill(id: ID!): Skill
 }
 
 type Mutation {
   createCv(createCvInput: CreateCvInput!): Cv!
-  updateCv(updateCvInput: UpdateCvInput!): Cv!
   deleteCv(id: ID!): Cv!
+  updateCv(updateCvInput: UpdateCvInput!): Cv!
 }
 
-input CreateCvInput {
-  name: String!
-  age: Float!
-  job: String!
-  userId: ID!
-  skillIds: [ID!]!
+type Query {
+  cv(id: ID!): Cv
+  cvs: [Cv!]!
+  skill(id: ID!): Skill
+  skills: [Skill!]!
+  user(id: ID!): User
+  users: [User!]!
 }
 
-input UpdateCvInput {
-  name: String
-  age: Float
-  job: String
-  userId: ID
-  skillIds: [ID!]
+type Skill {
+  cvs: [Cv!]
+  designation: String!
   id: ID!
 }
 
 type Subscription {
   cvAdded: Cv!
-  cvUpdated: Cv!
   cvDeleted: Cv!
+  cvUpdated: Cv!
+}
+
+input UpdateCvInput {
+  age: Float
+  id: ID!
+  job: String
+  name: String
+  skillIds: [ID!]
+  userId: ID
+}
+
+type User {
+  cvs: [Cv!]
+  email: String!
+  id: ID!
+  name: String!
+  role: String!
 }

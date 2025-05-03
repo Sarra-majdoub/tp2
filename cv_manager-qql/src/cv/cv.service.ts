@@ -1,104 +1,191 @@
+// src/cv/cv.service.ts
 import { Injectable } from '@nestjs/common';
-import { Context } from '../context';
-import { DbCv } from '../db';
+import { PrismaService } from '../prisma/prisma.service';
 import { CreateCvInput } from './dto/create-cv.input';
 import { UpdateCvInput } from './dto/update-cv.input';
 import { pubSub, CvEvents } from './cv.pubsub';
 
 @Injectable()
 export class CvService {
-  getCvs(context: Context) {
-    return context.db.cvs;
+  constructor(private prisma: PrismaService) {}
+
+  async getCvs() {
+    return this.prisma.cv.findMany();
   }
 
-  getCvById(id: string, context: Context) {
-    return context.db.cvs.find((cv) => cv.id === id);
+  async getCvById(id: string) {
+    return this.prisma.cv.findUnique({
+      where: { id },
+    });
   }
 
-  getUserForCv(cv: DbCv, context: Context) {
-    return context.db.users.find((user) => user.id === cv.userId);
+  async getUserForCv(cvId: string) {
+    const cv = await this.prisma.cv.findUnique({
+      where: { id: cvId },
+      include: { user: true },
+    });
+    return cv?.user;
   }
 
-  getSkillsForCv(cv: DbCv, context: Context) {
-    return context.db.skills.filter((skill) => cv.skillIds.includes(skill.id));
+  async getSkillsForCv(cvId: string) {
+    const cvSkills = await this.prisma.cvSkill.findMany({
+      where: { cvId },
+      include: { skill: true },
+    });
+    return cvSkills.map(cvSkill => cvSkill.skill);
   }
 
-  createCv(createCvInput: CreateCvInput, context: Context) {
-    const userExists = context.db.users.some(
-      (user) => user.id === createCvInput.userId,
-    );
-    if (!userExists) {
-      throw new Error(`User with ID ${createCvInput.userId} does not exist`);
+  async createCv(createCvInput: CreateCvInput) {
+    // Verify user exists
+    const user = await this.prisma.user.findUnique({
+      where: { id: createCvInput.userId },
+    });
+    
+    if (!user) {
+      throw new Error(`User with ID ${createCvInput.userId} not found`);
     }
 
-    const skillIdsExist = createCvInput.skillIds.every((skillId) =>
-      context.db.skills.some((skill) => skill.id === skillId),
-    );
+    // Verify all skills exist
+    const skills = await this.prisma.skill.findMany({
+      where: {
+        id: { in: createCvInput.skillIds },
+      },
+    });
 
-    if (!skillIdsExist) {
-      throw new Error(`One or more skills do not exist`);
+    if (skills.length !== createCvInput.skillIds.length) {
+      throw new Error('One or more skills do not exist');
     }
 
-    const newCv = {
-      id: String(context.db.cvs.length + 1),
-      ...createCvInput,
-    };
-    context.db.cvs.push(newCv);
+    // Create the CV using a transaction
+    const newCv = await this.prisma.$transaction(async (prisma) => {
+      // Create the CV
+      const cv = await prisma.cv.create({
+        data: {
+          name: createCvInput.name,
+          age: createCvInput.age,
+          job: createCvInput.job,
+          userId: createCvInput.userId,
+        },
+      });
+      
 
-    // Publish the CV creation event
-    pubSub.publish(CvEvents.CV_ADDED, { cvCreated: newCv });
+      // Create the CV-Skill relationships
+      for (const skillId of createCvInput.skillIds) {
+        await prisma.cvSkill.create({
+          data: {
+            cvId: cv.id,
+            skillId,
+          },
+        });
+      }
+
+      return cv;
+    });
+
+    // Publish the event for subscriptions
+    pubSub.publish(CvEvents.CV_ADDED, { cvAdded: newCv });
+    
     return newCv;
   }
 
-  updateCv(updateCvInput: UpdateCvInput, context: Context) {
-    const cvIndex = context.db.cvs.findIndex(
-      (cv) => cv.id === updateCvInput.id,
-    );
+  async updateCv(updateCvInput: UpdateCvInput) {
+    // Verify CV exists
+    const cv = await this.prisma.cv.findUnique({
+      where: { id: updateCvInput.id },
+    });
 
-    if (cvIndex === -1) {
-      throw new Error(`CV with ID ${updateCvInput.id} does not exist`);
+    if (!cv) {
+      throw new Error(`CV with ID ${updateCvInput.id} not found`);
     }
 
+    // Verify user if provided
     if (updateCvInput.userId) {
-      const userExists = context.db.users.some(
-        (user) => user.id === updateCvInput.userId,
-      );
+      const userExists = await this.prisma.user.findUnique({
+        where: { id: updateCvInput.userId },
+      });
+      
       if (!userExists) {
         throw new Error(`User with ID ${updateCvInput.userId} not found`);
       }
     }
 
-    if (updateCvInput.skillIds) {
-      const allSkillsExist = updateCvInput.skillIds.every((skillId) =>
-        context.db.skills.some((skill) => skill.id === skillId),
-      );
-      if (!allSkillsExist) {
-        throw new Error('One or more skills do not exist');
+    // Update the CV using a transaction
+    const updatedCv = await this.prisma.$transaction(async (prisma) => {
+      // Update the CV
+      const updatedCv = await prisma.cv.update({
+        where: { id: updateCvInput.id },
+        data: {
+          name: updateCvInput.name !== undefined ? updateCvInput.name : undefined,
+          age: updateCvInput.age !== undefined ? updateCvInput.age : undefined,
+          job: updateCvInput.job !== undefined ? updateCvInput.job : undefined,
+          userId: updateCvInput.userId !== undefined ? updateCvInput.userId : undefined,
+        },
+      });
+
+      // Update skills if provided
+      if (updateCvInput.skillIds) {
+        // Verify all skills exist
+        const skills = await prisma.skill.findMany({
+          where: {
+            id: { in: updateCvInput.skillIds },
+          },
+        });
+
+        if (skills.length !== updateCvInput.skillIds.length) {
+          throw new Error('One or more skills do not exist');
+        }
+
+        // Delete existing CV-Skill relationships
+        await prisma.cvSkill.deleteMany({
+          where: { cvId: updateCvInput.id },
+        });
+
+        // Create new CV-Skill relationships
+        for (const skillId of updateCvInput.skillIds) {
+          await prisma.cvSkill.create({
+            data: {
+              cvId: updateCvInput.id,
+              skillId,
+            },
+          });
+        }
       }
-    }
 
-    const updatedCv = {
-      ...context.db.cvs[cvIndex],
-      ...updateCvInput,
-    };
-    context.db.cvs[cvIndex] = updatedCv;
+      return updatedCv;
+    });
 
-    // Publish the CV update event
+    // Publish the event for subscriptions
     pubSub.publish(CvEvents.CV_UPDATED, { cvUpdated: updatedCv });
+    
     return updatedCv;
   }
 
-  deleteCv(id: string, context: Context) {
-    const cvIndex = context.db.cvs.findIndex((cv) => cv.id === id);
-    if (cvIndex === -1) {
+  async deleteCv(id: string) {
+    // Verify CV exists
+    const cv = await this.prisma.cv.findUnique({
+      where: { id },
+    });
+
+    if (!cv) {
       throw new Error(`CV with ID ${id} not found`);
     }
 
-    const deletedCv = context.db.cvs[cvIndex];
-    context.db.cvs.splice(cvIndex, 1);
+    // Delete the CV using a transaction
+    const deletedCv = await this.prisma.$transaction(async (prisma) => {
+      // Delete CV-Skill relationships
+      await prisma.cvSkill.deleteMany({
+        where: { cvId: id },
+      });
 
-    // Publish the CV deletion event
+      // Delete the CV
+      return await prisma.cv.delete({
+        where: { id },
+      });
+    });
+
+    // Publish the event for subscriptions
     pubSub.publish(CvEvents.CV_DELETED, { cvDeleted: deletedCv });
+    
     return deletedCv;
   }
 }

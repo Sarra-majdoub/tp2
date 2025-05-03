@@ -1,19 +1,26 @@
+// src/user/user.service.ts
 import { Injectable } from '@nestjs/common';
-import { Context } from '../context';
-import { DbCv } from '../db';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class UserService {
-    
-  getUsers(context: Context) {
-    return context.db.users;
+  constructor(private prisma: PrismaService) {}
+
+  async getUsers() {
+    return this.prisma.user.findMany();
   }
 
-  getUserById(id: string, context: Context) {
-    return context.db.users.find(user => user.id === id);
+  async getUserById(id: string) {
+    return this.prisma.user.findUnique({
+      where: { id },
+    });
   }
 
-  getCvsForUser(user: DbCv, context: Context) {
-    return context.db.cvs.filter(cv => cv.userId === user.id);
+  async getCvsForUser(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { cvs: true },
+    });
+    return user?.cvs || [];
   }
 }

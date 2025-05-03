@@ -1,31 +1,25 @@
+// src/skill/skill.resolver.ts
 import { Resolver, Query, Args, ID, ResolveField, Parent } from '@nestjs/graphql';
-import { Skill } from './models/skill.model';
 import { SkillService } from './skill.service';
-import { Context } from '../context';
+import { Skill } from './models/skill.model';
 import { Cv } from '../cv/models/cv.model';
-import { DbCv } from '../db';
-import { Inject, Res } from '@nestjs/common';
-import { CONTEXT } from '@nestjs/graphql';
 
-@Resolver(() => Skill) 
+@Resolver(() => Skill)
 export class SkillResolver {
-  constructor(
-    private skillService: SkillService,
-    @Inject(CONTEXT) private context: Context,
-  ) {}
+  constructor(private skillService: SkillService) {}
 
   @Query(() => [Skill])
-  skills(): Skill[] {
-    return this.skillService.getSkills(this.context) as unknown as Skill[];
+  async skills(): Promise<Skill[]> {
+    return this.skillService.getSkills();
   }
 
   @Query(() => Skill, { nullable: true })
-  skill(@Args('id', { type: () => ID }) id: string): Skill | undefined {
-    return this.skillService.getSkillById(id, this.context) as unknown as Skill;
+  async skill(@Args('id', { type: () => ID }) id: string): Promise<Skill | null> {
+    return this.skillService.getSkillById(id);
   }
 
   @ResolveField(() => [Cv])
-  cvs(@Parent() skill: DbCv): Cv[] {
-    return this.skillService.getCvsForSkill(skill, this.context) as unknown as Cv[];
+  async cvs(@Parent() skill: Skill): Promise<Cv[]> {
+    return this.skillService.getCvsForSkill(skill.id);
   }
 }

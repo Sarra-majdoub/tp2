@@ -1,18 +1,26 @@
+// src/skill/skill.service.ts
 import { Injectable } from '@nestjs/common';
-import { Context } from '../context';
-import { DbCv } from '../db';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class SkillService {
-  getSkills(context: Context) {
-    return context.db.skills;
+  constructor(private prisma: PrismaService) {}
+
+  async getSkills() {
+    return this.prisma.skill.findMany();
   }
 
-  getSkillById(id: string, context: Context) {
-    return context.db.skills.find(skill => skill.id === id);
+  async getSkillById(id: string) {
+    return this.prisma.skill.findUnique({
+      where: { id },
+    });
   }
 
-  getCvsForSkill(skill: DbCv, context: Context) {
-    return context.db.cvs.filter(cv => cv.skillIds.includes(skill.id));
+  async getCvsForSkill(skillId: string) {
+    const cvSkills = await this.prisma.cvSkill.findMany({
+      where: { skillId },
+      include: { cv: true },
+    });
+    return cvSkills.map(cvSkill => cvSkill.cv);
   }
 }
